@@ -1,0 +1,90 @@
+---
+title: "Predicting Barbell Lifts correct and incorrectly"
+author: "Piyush"
+date: "Wednesday, January 21, 2015"
+output: html_document
+---
+Loading relevant packages and dataset
+```{r readFiles,echo=TRUE}
+library(dplyr)
+library(caret)
+library(randomForest)
+test<-read.csv("pml-testing.csv")
+train<-read.csv("pml-training.csv")
+
+dim(test);dim(train)
+```
+
+
+The next step is to look for the missing values in the test data set. If the number of NA values for a particular predictor is more than 10, we will not use the predictor for predicting.
+
+
+```{r filterPredictors, echo=TRUE}
+naValue<-sapply(test, function(x)sum(is.na(x))) 
+length(naValue)
+naValue<-naValue[(naValue<=10)] 
+test_names<-names(naValue)
+```
+
+
+The next step will be taking a subset of the original datasets. 
+
+```{r finalDatasets, echo=TRUE}
+test1<-subset(test,select=test_names) 
+dim(test1)
+
+train_names<-names(train)
+final_names<-intersect(test_names,train_names)
+#Subsetting the training set with selected variables
+train1<-subset(train,select=final_names) 
+dim(train1)
+
+#Removing the serial no. variable and adding the predictor variable to the training set
+test1<-test1[,-1]
+train1<-train1[,-1]
+classe<-train[,160]
+train1<-cbind(train1,classe)
+
+#Removing variables based on the context/knowledge of the problem statement
+test1<-test1[,-(1:5)]
+test1<-test1[,-(55)]
+train1<-train1[,-(1:5)]
+
+
+#Creating the training and cross validation set
+inTrain<-createDataPartition(y=train1$classe, p=0.75, list=FALSE)
+training<-train1[inTrain,]
+testing<-train1[-inTrain,]
+
+```
+
+
+```{r runPrediction, echo=TRUE}
+#Training the model
+model<-randomForest(classe~.,data=training)
+
+#Cross Valdating for out of sample error
+pred1 <- predict(model, testing)
+confusionMatrix(pred1, testing$classe)
+
+```
+
+
+```{r writeOutput, echo=TRUE}
+#Function for output files
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+x<-test1
+
+#Predicting the test set
+final_results <- predict(model, newdata=x)
+final_results
+pml_write_files(final_results)
+
+```
+
